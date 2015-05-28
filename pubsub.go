@@ -34,11 +34,16 @@ type Message struct {
 	Reply   chan interface{}
 }
 
+type Mailbox struct {
+	Topic   string
+	Content *Message
+}
+
 type cmd struct {
 	op     operation
 	topics []string
-	ch     chan *Message
-	msg    *Message
+	ch     chan *Mailbox
+	msg    *Mailbox
 }
 
 // New creates a new PubSub and starts a goroutine for handling operations.
@@ -51,37 +56,37 @@ func New(capacity int) *PubSub {
 
 // Sub returns a channel on which messages published on any of
 // the specified topics can be received.
-func (ps *PubSub) Sub(topics ...string) chan *Message {
+func (ps *PubSub) Sub(topics ...string) chan *Mailbox {
 	return ps.sub(sub, topics...)
 }
 
 // SubOnce is similar to Sub, but only the first message published, after subscription,
 // on any of the specified topics can be received.
-func (ps *PubSub) SubOnce(topics ...string) chan *Message {
+func (ps *PubSub) SubOnce(topics ...string) chan *Mailbox {
 	return ps.sub(subOnce, topics...)
 }
 
-func (ps *PubSub) sub(op operation, topics ...string) chan *Message {
-	ch := make(chan *Message, ps.capacity)
+func (ps *PubSub) sub(op operation, topics ...string) chan *Mailbox {
+	ch := make(chan *Mailbox, ps.capacity)
 	ps.cmdChan <- cmd{op: op, topics: topics, ch: ch}
 	return ch
 }
 
 // AddSub adds subscriptions to an existing channel.
-func (ps *PubSub) AddSub(ch chan *Message, topics ...string) {
+func (ps *PubSub) AddSub(ch chan *Mailbox, topics ...string) {
 	ps.cmdChan <- cmd{op: sub, topics: topics, ch: ch}
 }
 
 // Pub publishes the given message to all subscribers of
 // the specified topics.
 func (ps *PubSub) Pub(msg *Message, topics ...string) {
-	ps.cmdChan <- cmd{op: pub, topics: topics, msg: msg}
+	ps.cmdChan <- cmd{op: pub, topics: topics, msg: &Mailbox{Topic: "", Content: msg}}
 }
 
 // Unsub unsubscribes the given channel from the specified
 // topics. If no topic is specified, it is unsubscribed
 // from all topics.
-func (ps *PubSub) Unsub(ch chan *Message, topics ...string) {
+func (ps *PubSub) Unsub(ch chan *Mailbox, topics ...string) {
 	if len(topics) == 0 {
 		ps.cmdChan <- cmd{op: unsubAll, ch: ch}
 		return
@@ -104,8 +109,8 @@ func (ps *PubSub) Shutdown() {
 
 func (ps *PubSub) start() {
 	reg := registry{
-		topics:    make(map[string]map[chan *Message]bool),
-		revTopics: make(map[chan *Message]map[string]bool),
+		topics:    make(map[string]map[chan *Mailbox]bool),
+		revTopics: make(map[chan *Mailbox]map[string]bool),
 	}
 
 loop:
@@ -152,13 +157,13 @@ loop:
 // registry maintains the current subscription state. It's not
 // safe to access a registry from multiple goroutines simultaneously.
 type registry struct {
-	topics    map[string]map[chan *Message]bool
-	revTopics map[chan *Message]map[string]bool
+	topics    map[string]map[chan *Mailbox]bool
+	revTopics map[chan *Mailbox]map[string]bool
 }
 
-func (reg *registry) add(topic string, ch chan *Message, once bool) {
+func (reg *registry) add(topic string, ch chan *Mailbox, once bool) {
 	if reg.topics[topic] == nil {
-		reg.topics[topic] = make(map[chan *Message]bool)
+		reg.topics[topic] = make(map[chan *Mailbox]bool)
 	}
 	reg.topics[topic][ch] = once
 
@@ -168,8 +173,9 @@ func (reg *registry) add(topic string, ch chan *Message, once bool) {
 	reg.revTopics[ch][topic] = true
 }
 
-func (reg *registry) send(topic string, msg *Message) {
+func (reg *registry) send(topic string, msg *Mailbox) {
 	for ch, once := range reg.topics[topic] {
+		msg.Topic = topic
 		ch <- msg
 		if once {
 			for topic := range reg.revTopics[ch] {
@@ -185,13 +191,13 @@ func (reg *registry) removeTopic(topic string) {
 	}
 }
 
-func (reg *registry) removeChannel(ch chan *Message) {
+func (reg *registry) removeChannel(ch chan *Mailbox) {
 	for topic := range reg.revTopics[ch] {
 		reg.remove(topic, ch)
 	}
 }
 
-func (reg *registry) remove(topic string, ch chan *Message) {
+func (reg *registry) remove(topic string, ch chan *Mailbox) {
 	if _, ok := reg.topics[topic]; !ok {
 		return
 	}
