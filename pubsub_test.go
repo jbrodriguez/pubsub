@@ -1,6 +1,10 @@
 // Copyright 2013, Chandra Sekar S.  All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the README.md file.
+// Copyright 2017, Juan B. Rodriguez
+// The modifications to this package made by
+// Juan B. Rodriguez, are governed by a MIT license,
+// that can be found in the LICENSE file.
 
 package pubsub
 
@@ -22,127 +26,118 @@ type Suite struct{}
 
 func (s *Suite) TestSub(c *check.C) {
 	ps := New(1)
-	ch1 := ps.Sub("t1")
-	ch2 := ps.Sub("t1")
-	ch3 := ps.Sub("t2")
+	mb1 := ps.CreateMailbox()
+	mb2 := ps.CreateMailbox()
+	mb3 := ps.CreateMailbox()
+	ps.Sub(mb1, "t1")
+	ps.Sub(mb2, "t1")
+	ps.Sub(mb3, "t2")
 
-	ps.Pub("hi", "t1")
-	c.Check(<-ch1, check.Equals, "hi")
-	c.Check(<-ch2, check.Equals, "hi")
+	ps.Pub(&Message{Payload: "hi"}, "t1")
+	c.Check(<-mb1, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
+	c.Check(<-mb2, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
 
-	ps.Pub("hello", "t2")
-	c.Check(<-ch3, check.Equals, "hello")
+	ps.Pub(&Message{Payload: "hello"}, "t2")
+	c.Check(<-mb3, check.DeepEquals, &Mailbox{Topic: "t2", Content: &Message{Payload: "hello"}})
 
 	ps.Shutdown()
-	_, ok := <-ch1
+	_, ok := <-mb1
 	c.Check(ok, check.Equals, false)
-	_, ok = <-ch2
+	_, ok = <-mb2
 	c.Check(ok, check.Equals, false)
-	_, ok = <-ch3
+	_, ok = <-mb3
 	c.Check(ok, check.Equals, false)
 }
 
 func (s *Suite) TestSubOnce(c *check.C) {
 	ps := New(1)
-	ch := ps.SubOnce("t1")
+	mb := ps.CreateMailbox()
+	ps.SubOnce(mb, "t1")
 
-	ps.Pub("hi", "t1")
-	c.Check(<-ch, check.Equals, "hi")
+	ps.Pub(&Message{Payload: "hi"}, "t1")
+	c.Check(<-mb, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
 
-	_, ok := <-ch
+	_, ok := <-mb
 	c.Check(ok, check.Equals, false)
-	ps.Shutdown()
-}
-
-func (s *Suite) TestAddSub(c *check.C) {
-	ps := New(1)
-	ch1 := ps.Sub("t1")
-	ch2 := ps.Sub("t2")
-
-	ps.Pub("hi1", "t1")
-	c.Check(<-ch1, check.Equals, "hi1")
-
-	ps.Pub("hi2", "t2")
-	c.Check(<-ch2, check.Equals, "hi2")
-
-	ps.AddSub(ch1, "t2", "t3")
-	ps.Pub("hi3", "t2")
-	c.Check(<-ch1, check.Equals, "hi3")
-	c.Check(<-ch2, check.Equals, "hi3")
-
-	ps.Pub("hi4", "t3")
-	c.Check(<-ch1, check.Equals, "hi4")
-
 	ps.Shutdown()
 }
 
 func (s *Suite) TestUnsub(c *check.C) {
 	ps := New(1)
-	ch := ps.Sub("t1")
+	mb := ps.CreateMailbox()
+	ps.Sub(mb, "t1")
 
-	ps.Pub("hi", "t1")
-	c.Check(<-ch, check.Equals, "hi")
+	ps.Pub(&Message{Payload: "hi"}, "t1")
+	c.Check(<-mb, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
 
-	ps.Unsub(ch, "t1")
-	_, ok := <-ch
+	ps.Unsub(mb, "t1")
+	_, ok := <-mb
 	c.Check(ok, check.Equals, false)
 	ps.Shutdown()
 }
 
 func (s *Suite) TestUnsubAll(c *check.C) {
 	ps := New(1)
-	ch1 := ps.Sub("t1", "t2", "t3")
-	ch2 := ps.Sub("t1", "t3")
+	mb1 := ps.CreateMailbox()
+	mb2 := ps.CreateMailbox()
 
-	ps.Unsub(ch1)
+	ps.Sub(mb1, "t1", "t2", "t3")
+	ps.Sub(mb2, "t1", "t3")
 
-	m, ok := <-ch1
+	ps.Unsub(mb1)
+
+	m, ok := <-mb1
 	c.Check(ok, check.Equals, false)
 
-	ps.Pub("hi", "t1")
-	m, ok = <-ch2
-	c.Check(m, check.Equals, "hi")
+	ps.Pub(&Message{Payload: "hi"}, "t1")
+	m, ok = <-mb2
+	c.Check(m, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
 
 	ps.Shutdown()
 }
 
 func (s *Suite) TestClose(c *check.C) {
 	ps := New(1)
-	ch1 := ps.Sub("t1")
-	ch2 := ps.Sub("t1")
-	ch3 := ps.Sub("t2")
-	ch4 := ps.Sub("t3")
+	mb1 := ps.CreateMailbox()
+	mb2 := ps.CreateMailbox()
+	mb3 := ps.CreateMailbox()
+	mb4 := ps.CreateMailbox()
+	ps.Sub(mb1, "t1")
+	ps.Sub(mb2, "t1")
+	ps.Sub(mb3, "t2")
+	ps.Sub(mb4, "t3")
 
-	ps.Pub("hi", "t1")
-	ps.Pub("hello", "t2")
-	c.Check(<-ch1, check.Equals, "hi")
-	c.Check(<-ch2, check.Equals, "hi")
-	c.Check(<-ch3, check.Equals, "hello")
+	ps.Pub(&Message{Payload: "hi"}, "t1")
+	ps.Pub(&Message{Payload: "hello"}, "t2")
+	c.Check(<-mb1, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
+	c.Check(<-mb2, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
+	c.Check(<-mb3, check.DeepEquals, &Mailbox{Topic: "t2", Content: &Message{Payload: "hello"}})
 
 	ps.Close("t1", "t2")
-	_, ok := <-ch1
+	_, ok := <-mb1
 	c.Check(ok, check.Equals, false)
-	_, ok = <-ch2
+	_, ok = <-mb2
 	c.Check(ok, check.Equals, false)
-	_, ok = <-ch3
+	_, ok = <-mb3
 	c.Check(ok, check.Equals, false)
 
-	ps.Pub("welcome", "t3")
-	c.Check(<-ch4, check.Equals, "welcome")
+	ps.Pub(&Message{Payload: "welcome"}, "t3")
+	c.Check(<-mb4, check.DeepEquals, &Mailbox{Topic: "t3", Content: &Message{Payload: "welcome"}})
 
 	ps.Shutdown()
 }
 
 func (s *Suite) TestUnsubAfterClose(c *check.C) {
 	ps := New(1)
-	ch := ps.Sub("t1")
+	mb := ps.CreateMailbox()
+	ps.Sub(mb, "t1")
 	defer func() {
-		ps.Unsub(ch, "t1")
+		ps.Unsub(mb, "t1")
 		ps.Shutdown()
 	}()
 
 	ps.Close("t1")
-	_, ok := <-ch
+	_, ok := <-mb
 	c.Check(ok, check.Equals, false)
 }
 
@@ -155,58 +150,64 @@ func (s *Suite) TestShutdown(c *check.C) {
 
 func (s *Suite) TestMultiSub(c *check.C) {
 	ps := New(1)
-	ch := ps.Sub("t1", "t2")
+	mb := ps.CreateMailbox()
+	ps.Sub(mb, "t1", "t2")
 
-	ps.Pub("hi", "t1")
-	c.Check(<-ch, check.Equals, "hi")
+	ps.Pub(&Message{Payload: "hi"}, "t1")
+	c.Check(<-mb, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
 
-	ps.Pub("hello", "t2")
-	c.Check(<-ch, check.Equals, "hello")
+	ps.Pub(&Message{Payload: "hello"}, "t2")
+	c.Check(<-mb, check.DeepEquals, &Mailbox{Topic: "t2", Content: &Message{Payload: "hello"}})
 
 	ps.Shutdown()
-	_, ok := <-ch
+	_, ok := <-mb
 	c.Check(ok, check.Equals, false)
 }
 
 func (s *Suite) TestMultiSubOnce(c *check.C) {
 	ps := New(1)
-	ch := ps.SubOnce("t1", "t2")
+	mb := ps.CreateMailbox()
+	ps.SubOnce(mb, "t1", "t2")
 
-	ps.Pub("hi", "t1")
-	c.Check(<-ch, check.Equals, "hi")
+	ps.Pub(&Message{Payload: "hi"}, "t1")
+	c.Check(<-mb, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
 
-	ps.Pub("hello", "t2")
+	ps.Pub(&Message{Payload: "hello"}, "t2")
 
-	_, ok := <-ch
+	_, ok := <-mb
 	c.Check(ok, check.Equals, false)
 	ps.Shutdown()
 }
 
 func (s *Suite) TestMultiPub(c *check.C) {
 	ps := New(1)
-	ch1 := ps.Sub("t1")
-	ch2 := ps.Sub("t2")
+	mb1 := ps.CreateMailbox()
+	mb2 := ps.CreateMailbox()
 
-	ps.Pub("hi", "t1", "t2")
-	c.Check(<-ch1, check.Equals, "hi")
-	c.Check(<-ch2, check.Equals, "hi")
+	ps.Sub(mb1, "t1")
+	ps.Sub(mb2, "t2")
+
+	ps.Pub(&Message{Payload: "hi"}, "t2", "t1")
+	c.Check(<-mb1, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
+	c.Check(<-mb2, check.DeepEquals, &Mailbox{Topic: "t2", Content: &Message{Payload: "hi"}})
 
 	ps.Shutdown()
 }
 
 func (s *Suite) TestMultiUnsub(c *check.C) {
 	ps := New(1)
-	ch := ps.Sub("t1", "t2", "t3")
+	mb := ps.CreateMailbox()
+	ps.Sub(mb, "t1", "t2", "t3")
 
-	ps.Unsub(ch, "t1")
+	ps.Unsub(mb, "t1")
 
-	ps.Pub("hi", "t1")
+	ps.Pub(&Message{Payload: "hi"}, "t1")
 
-	ps.Pub("hello", "t2")
-	c.Check(<-ch, check.Equals, "hello")
+	ps.Pub(&Message{Payload: "hello"}, "t2")
+	c.Check(<-mb, check.DeepEquals, &Mailbox{Topic: "t2", Content: &Message{Payload: "hello"}})
 
-	ps.Unsub(ch, "t2", "t3")
-	_, ok := <-ch
+	ps.Unsub(mb, "t2", "t3")
+	_, ok := <-mb
 	c.Check(ok, check.Equals, false)
 
 	ps.Shutdown()
@@ -214,17 +215,18 @@ func (s *Suite) TestMultiUnsub(c *check.C) {
 
 func (s *Suite) TestMultiClose(c *check.C) {
 	ps := New(1)
-	ch := ps.Sub("t1", "t2")
+	mb := ps.CreateMailbox()
+	ps.Sub(mb, "t1", "t2")
 
-	ps.Pub("hi", "t1")
-	c.Check(<-ch, check.Equals, "hi")
+	ps.Pub(&Message{Payload: "hi"}, "t1")
+	c.Check(<-mb, check.DeepEquals, &Mailbox{Topic: "t1", Content: &Message{Payload: "hi"}})
 
 	ps.Close("t1")
-	ps.Pub("hello", "t2")
-	c.Check(<-ch, check.Equals, "hello")
+	ps.Pub(&Message{Payload: "hello"}, "t2")
+	c.Check(<-mb, check.DeepEquals, &Mailbox{Topic: "t2", Content: &Message{Payload: "hello"}})
 
 	ps.Close("t2")
-	_, ok := <-ch
+	_, ok := <-mb
 	c.Check(ok, check.Equals, false)
 
 	ps.Shutdown()

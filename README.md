@@ -1,3 +1,20 @@
+## Installation
+
+    go get github.com/jbrodriguez/pubsub
+
+## Documentation
+
+View the [API Documentation](http://godoc.org/github.com/jbrodriguez/pubsub).
+
+## License
+MIT
+
+## Credits
+This is a fork of [pubsub](github.com/cskr/pubsub ).
+
+Check the original README below.
+
+## Original README
 Install pubsub with,
 
     go get github.com/cskr/pubsub
