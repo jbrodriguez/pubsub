@@ -1,0 +1,17 @@
+2017-04-12 - 1.0.0
+
+First tagged version.
+
+The api was also modified, so that the subscriptions apis take the channel
+they operate on as the first param in their signature.
+
+A separate function (CreateMailbox) provides the channel and AddSub can be
+removed.
+
+Additionally two types were added:
+1. Mailbox
+Sends the topic to the receiving component, for further processing
+
+2. Message
+Send this struct instead of interface{}
+

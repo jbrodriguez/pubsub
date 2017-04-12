@@ -1,0 +1,47 @@
+Version 1.0.0 - 2017-04-12
+- Initial commit.
+- Add license header.
+- Documentation.
+- Avoid shared memory.
+- Close channel before removing.
+- Support clean shutdown.
+- Check previous shutdown in Shutdown().
+- Fix documentation wording.
+- Replace "any" type with interface{}.
+- Make Shutdown idempotent
+- Allow specifying subscription channel's capacity
+- Tests
+- Support subscribing to multiple topics on single channel
+- Shutdown test
+- Minor documentation fixes
+- Remove shutdown flag and let operations after shutdown panic
+- Remove panic warning
+- Add build status image to README
+- Support closing topics
+- Cleanup initialization
+- Allow publishing to and unsubscribing from multiple topics in a single call
+- Do not panic on Unsub after Close
+- separate data into thread internal and external context
+- renaming to non-exporting internalSubscription as per tuxychandru's request
+- added SubUpdate function and tests
+- Added unsubAll function so you can unsubscribe a channel
+- Unsubscribe channel from all topics if none specified
+- Rename SubUpdate to AddSub
+- Rename internalSubscriptions to registry
+- Use a single command channel
+- Complete current operation for all given topics before picking the next
+- Switch to BSD license
+- Fix license markdown
+- Cleanup README
+- Run gofmt -s
+- Replace interface{} with a custom struct (Message)
+- Fix missing interface{} substitutions
+- Fix shutdown test
+- Change import path of gocheck
+- Fix username in paths in README
+- - Add mailbox structure in order to return the topic name when delivering messages to the clients registered to any topic
+- Refactor API
+- Implement CI
+
+
+
