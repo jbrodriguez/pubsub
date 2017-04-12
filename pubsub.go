@@ -1,11 +1,15 @@
 // Copyright 2013, Chandra Sekar S.  All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the README.md file.
+// Copyright 2017, Juan B. Rodriguez
+// The modifications to this package made by
+// Juan B. Rodriguez, are governed by a MIT license,
+// that can be found in the LICENSE file.
 
 // Package pubsub implements a simple multi-topic pub-sub
 // library.
 //
-// Topics must be strings and messages of any type can be
+// Topics must be strings and messages of type Mailbox can be
 // published. A topic can have any number of subcribers and
 // all of them receive messages published on the topic.
 package pubsub
@@ -43,7 +47,7 @@ type cmd struct {
 	op     operation
 	topics []string
 	ch     chan *Mailbox
-	msg    *Mailbox
+	msg    *Message
 }
 
 // New creates a new PubSub and starts a goroutine for handling operations.
@@ -54,33 +58,29 @@ func New(capacity int) *PubSub {
 	return ps
 }
 
-// Sub returns a channel on which messages published on any of
-// the specified topics can be received.
-func (ps *PubSub) Sub(topics ...string) chan *Mailbox {
-	return ps.sub(sub, topics...)
+// CreateMailbox creates a channel that will be used to subscribe to
+// and send messages to
+func (ps *PubSub) CreateMailbox() chan *Mailbox {
+	return make(chan *Mailbox, ps.capacity)
+}
+
+// Sub associates a channel to messages published on any of
+// the specified topics.
+func (ps *PubSub) Sub(ch chan *Mailbox, topics ...string) {
+	ps.cmdChan <- cmd{op: sub, topics: topics, ch: ch}
 }
 
 // SubOnce is similar to Sub, but only the first message published, after subscription,
 // on any of the specified topics can be received.
-func (ps *PubSub) SubOnce(topics ...string) chan *Mailbox {
-	return ps.sub(subOnce, topics...)
-}
-
-func (ps *PubSub) sub(op operation, topics ...string) chan *Mailbox {
-	ch := make(chan *Mailbox, ps.capacity)
-	ps.cmdChan <- cmd{op: op, topics: topics, ch: ch}
-	return ch
-}
-
-// AddSub adds subscriptions to an existing channel.
-func (ps *PubSub) AddSub(ch chan *Mailbox, topics ...string) {
-	ps.cmdChan <- cmd{op: sub, topics: topics, ch: ch}
+func (ps *PubSub) SubOnce(ch chan *Mailbox, topics ...string) {
+	ps.cmdChan <- cmd{op: subOnce, topics: topics, ch: ch}
 }
 
 // Pub publishes the given message to all subscribers of
 // the specified topics.
 func (ps *PubSub) Pub(msg *Message, topics ...string) {
-	ps.cmdChan <- cmd{op: pub, topics: topics, msg: &Mailbox{Topic: "", Content: msg}}
+	// ps.cmdChan <- cmd{op: pub, topics: topics, msg: &Mailbox{Topic: "", Content: msg}}
+	ps.cmdChan <- cmd{op: pub, topics: topics, msg: msg}
 }
 
 // Unsub unsubscribes the given channel from the specified
@@ -173,10 +173,9 @@ func (reg *registry) add(topic string, ch chan *Mailbox, once bool) {
 	reg.revTopics[ch][topic] = true
 }
 
-func (reg *registry) send(topic string, msg *Mailbox) {
+func (reg *registry) send(topic string, msg *Message) {
 	for ch, once := range reg.topics[topic] {
-		msg.Topic = topic
-		ch <- msg
+		ch <- &Mailbox{Topic: topic, Content: msg}
 		if once {
 			for topic := range reg.revTopics[ch] {
 				reg.remove(topic, ch)
