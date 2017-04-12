@@ -1,0 +1,12 @@
+test:
+    script:
+        - go test
+        # - scripts/rel-publish
+    only:
+        - /^wrk.*$/
+
+deploy:
+    script:
+        - scripts/rel-publish
+    only:
+        - /^rel.*$/
